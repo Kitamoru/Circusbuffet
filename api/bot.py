@@ -1,6 +1,7 @@
 import os
 import json
 import logging
+import asyncio
 from typing import Dict, List, Optional
 from functools import wraps
 
@@ -18,7 +19,6 @@ from telegram.ext import (
     MessageHandler,
     filters
 )
-from awsgi import response
 
 # Настройка логирования
 logging.basicConfig(
@@ -632,18 +632,26 @@ def calculate_order_total(order_id: int) -> float:
         logger.error(f"Ошибка расчета суммы заказа: {e}")
         return 0
 
-# Обработчик вебхука для Vercel
-async def webhook_handler(event, context):
-    if event.get('httpMethod') == 'POST':
+# Инициализация приложения
+application = Application.builder().token(BOT_TOKEN).build()
+
+# Добавляем обработчики
+application.add_handler(CommandHandler('start', start))
+application.add_handler(CallbackQueryHandler(button_handler))
+
+# Обработчик для Vercel
+async def handler(request):
+    if request.method == 'POST':
         # Проверяем секрет вебхука, если задан
         if WEBHOOK_SECRET:
-            token = event.get('headers', {}).get('X-Telegram-Bot-Api-Secret-Token')
+            token = request.headers.get('X-Telegram-Bot-Api-Secret-Token')
             if token != WEBHOOK_SECRET:
                 return {'statusCode': 403, 'body': 'Forbidden'}
         
         # Обрабатываем обновление
         try:
-            update = Update.de_json(json.loads(event['body']), application.bot)
+            data = await request.json()
+            update = Update.de_json(data, application.bot)
             await application.process_update(update)
         except Exception as e:
             logger.error(f"Ошибка обработки обновления: {e}")
@@ -652,14 +660,3 @@ async def webhook_handler(event, context):
         return {'statusCode': 200, 'body': 'OK'}
     
     return {'statusCode': 404, 'body': 'Not Found'}
-
-# Инициализация приложения
-application = Application.builder().token(BOT_TOKEN).build()
-
-# Добавляем обработчики
-application.add_handler(CommandHandler('start', start))
-application.add_handler(CallbackQueryHandler(button_handler))
-
-# Lambda handler для Vercel
-def vercel_handler(event, context):
-    return response(webhook_handler, event, context)
