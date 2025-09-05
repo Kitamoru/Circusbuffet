@@ -1,17 +1,16 @@
 {
-  "functions": {
-    "api/*.py": {
-      "runtime": "@vercel/python@3.9",
-      "includeFiles": "**/*.py"
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/bot.ts",
+      "use": "@vercel/node"
     }
-  },
+  ],
   "routes": [
     {
       "src": "/(.*)",
-      "dest": "/api/bot.py"
+      "dest": "/api/bot.ts",
+      "methods": ["POST", "GET"]
     }
-  ],
-  "env": {
-    "PYTHONPATH": "@"
-  }
+  ]
 }
