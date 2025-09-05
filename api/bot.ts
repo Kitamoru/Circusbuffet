@@ -2,7 +2,6 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { Telegraf, Markup, session, Scenes, Context } from 'telegraf';
 import { createClient } from '@supabase/supabase-js';
 import { Update } from 'telegraf/typings/core/types/typegram';
-import { InlineKeyboardButton } from 'telegraf/typings/markup';
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const SUPABASE_URL = process.env.SUPABASE_URL!;
@@ -25,12 +24,15 @@ interface Product {
   is_available: boolean;
 }
 
-interface MySession extends SessionData {}
+interface SceneSessionData extends SessionData {
+  __scenes?: any;
+}
 
 // Расширяем контекст Telegraf
 interface MyContext extends Context {
-  session: MySession;
-  scene: Scenes.SceneContextScene<MyContext>;
+  session: SceneSessionData;
+  scene: Scenes.SceneContextScene<MyContext, SceneSessionData>;
+  match?: RegExpExecArray | null;
 }
 
 // Product cache
