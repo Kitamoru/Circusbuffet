@@ -1,17 +1,6 @@
-import { VercelRequest, VercelResponse } from '@vercel/node';
-import { Telegraf, Markup, session, Scenes } from 'legraf';
+import { Telegraf, Markup, session, Scenes, Context } from 'telegraf';
 import { createClient } from '@supabase/supabase-js';
-import { InlineKeyboardButton } from 'telegraf/types';
-
-interface SessionData {
-  orderId?: number;
-  state?: string;
-}
-
-interface MyContext extends Scenes.SceneContext {
-  session: SessionData;
-  supabase: any;
-}
+import { Update } from 'telegraf/typings/core/types/typegram';
 
 const BOT_TOKEN = process.env.BOT_TOKEN!;
 const SUPABASE_URL = process.env.SUPABASE_URL!;
@@ -20,11 +9,34 @@ const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// Интерфейсы для типизации
+interface SessionData {
+  orderId?: number;
+  state?: string;
+}
+
+interface Product {
+  id: number;
+  name: string;
+  category: string;
+  price: number;
+  is_available: boolean;
+}
+
+// Расширяем контекст Telegraf
+interface MyContext extends Context {
+  session: SessionData;
+  scene: Scenes.SceneContextScene<MyContext>;
+}
+
 // Product cache
-let productCache = { data: null, timestamp: 0 };
+let productCache: { data: Product[] | null; timestamp: number } = { 
+  data: null, 
+  timestamp: 0 
+};
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
-const getProducts = async () => {
+const getProducts = async (): Promise<Product[] | null> => {
   const now = Date.now();
   if (productCache.data && now - productCache.timestamp < CACHE_DURATION) {
     return productCache.data;
@@ -48,13 +60,21 @@ const getProducts = async () => {
 const customerScene = new Scenes.BaseScene<MyContext>('customer');
 const sellerScene = new Scenes.BaseScene<MyContext>('seller');
 
-customerScene.enter(async (ctx) => {
+customerScene.enter(async (ctx: MyContext) => {
   await showMainMenu(ctx, 'Добро пожаловать в Popcorn Shop!');
 });
 
-customerScene.action(/add_(\d+)/, async (ctx) => {
+customerScene.action(/add_(\d+)/, async (ctx: MyContext) => {
+  if (!ctx.match || !ctx.from) return;
+  
   const productId = parseInt(ctx.match[1]);
   const products = await getProducts();
+  
+  if (!products) {
+    await ctx.answerCbQuery('Ошибка загрузки товаров');
+    return;
+  }
+  
   const product = products.find(p => p.id === productId);
   
   if (!product) {
@@ -106,7 +126,9 @@ customerScene.action(/add_(\d+)/, async (ctx) => {
 });
 
 // Seller scene handlers
-sellerScene.action(/take_(\d+)/, async (ctx) => {
+sellerScene.action(/take_(\d+)/, async (ctx: MyContext) => {
+  if (!ctx.match) return;
+  
   const orderId = parseInt(ctx.match[1]);
   
   try {
@@ -145,10 +167,14 @@ sellerScene.action(/take_(\d+)/, async (ctx) => {
 const stage = new Scenes.Stage<MyContext>([customerScene, sellerScene]);
 
 const bot = new Telegraf<MyContext>(BOT_TOKEN);
+
+// Расширяем сессию
 bot.use(session());
 bot.use(stage.middleware());
 
-bot.start(async (ctx) => {
+bot.start(async (ctx: MyContext) => {
+  if (!ctx.from) return;
+
   // Register user
   const { error } = await supabase
     .from('profiles')
@@ -178,12 +204,15 @@ async function showMainMenu(ctx: MyContext, message: string) {
   const { count } = await supabase
     .from('order_items')
     .select('*', { count: 'exact' })
-    .eq('order_id', ctx.session.orderId);
+    .eq('order_id', ctx.session.orderId || 0);
 
-  await ctx.replyWithMarkdownV2(message,
+  const cartCount = count || 0;
+
+  await ctx.reply(
+    message,
     Markup.inlineKeyboard([
       [Markup.button.callback('🍿 Заказать', 'show_menu')],
-      [Markup.button.callback(`🛒 Корзина (${count || 0})`, 'show_cart')],
+      [Markup.button.callback(`🛒 Корзина (${cartCount})`, 'show_cart')],
       [Markup.button.callback('📋 Мои заказы', 'show_orders')]
     ])
   );
@@ -196,7 +225,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
-      await bot.handleUpdate(req.body, res);
+      await bot.handleUpdate(req.body as Update, res);
     } catch (error) {
       console.error('Error handling update:', error);
       res.status(500).send('Error');
