@@ -1,3 +1,4 @@
+import { VercelRequest, VercelResponse } from '@vercel/node';
 import { Telegraf, Markup, session, Scenes, Context } from 'telegraf';
 import { createClient } from '@supabase/supabase-js';
 import { Update } from 'telegraf/typings/core/types/typegram';
