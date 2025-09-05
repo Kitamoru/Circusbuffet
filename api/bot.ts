@@ -13,7 +13,7 @@ const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 // Интерфейсы для типизации
 interface SessionData {
   orderId?: number;
-  state?: string;
+  state?: object; // Изменено с string на object
 }
 
 interface Product {
@@ -24,14 +24,14 @@ interface Product {
   is_available: boolean;
 }
 
-interface SceneSessionData extends SessionData {
-  __scenes?: any;
+interface SceneSessionData extends Scenes.SceneSessionData, SessionData {
+  // Наследуем от SceneSessionData и добавляем наши поля
 }
 
 // Расширяем контекст Telegraf
 interface MyContext extends Context {
   session: SceneSessionData;
-  scene: Scenes.SceneContextScene<MyContext, SceneSessionData>;
+  scene: Scenes.SceneContextScene<MyContext>;
   match?: RegExpExecArray | null;
 }
 
