@@ -1,14 +1,16 @@
 {
   "functions": {
-    "api/index.py": {
-      "runtime": "@vercel/python@1.0.0",
-      "handler": "vercel_handler"
+    "api/*.py": {
+      "runtime": "@vercel/python@3.9"
     }
   },
   "routes": [
     {
-      "src": "/api/bot",
-      "dest": "/api/index.py"
+      "src": "/(.*)",
+      "dest": "/api/webhook.py"
     }
-  ]
+  ],
+  "env": {
+    "PYTHONPATH": "@"
+  }
 }
