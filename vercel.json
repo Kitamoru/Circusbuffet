@@ -1,0 +1,14 @@
+{
+  "functions": {
+    "api/bot.py": {
+      "runtime": "python3.9",
+      "maxDuration": 30
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/bot",
+      "dest": "/api/bot.py"
+    }
+  ]
+}
