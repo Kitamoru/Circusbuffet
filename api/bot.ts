@@ -11,11 +11,6 @@ const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET!;
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Интерфейсы для типизации
-interface SessionData {
-  orderId?: number;
-  state?: object; // Изменено с string на object
-}
-
 interface Product {
   id: number;
   name: string;
@@ -24,14 +19,18 @@ interface Product {
   is_available: boolean;
 }
 
-interface SceneSessionData extends Scenes.SceneSessionData, SessionData {
-  // Наследуем от SceneSessionData и добавляем наши поля
+// Базовый интерфейс для сессии
+interface SessionData {
+  orderId?: number;
 }
 
-// Расширяем контекст Telegraf
+// Интерфейс для сессии сцены
+interface MySceneSession extends Scenes.SceneSessionData, SessionData {}
+
+// Интерфейс для контекста бота
 interface MyContext extends Context {
-  session: SceneSessionData;
-  scene: Scenes.SceneContextScene<MyContext>;
+  session: SessionData;
+  scene: Scenes.SceneContextScene<MyContext, MySceneSession>;
   match?: RegExpExecArray | null;
 }
 
@@ -226,7 +225,9 @@ const stage = new Scenes.Stage<MyContext>([customerScene, sellerScene]);
 const bot = new Telegraf<MyContext>(BOT_TOKEN);
 
 // Инициализация сессии
-bot.use(session({ defaultSession: () => ({}) }));
+bot.use(session({ 
+  defaultSession: () => ({}) 
+}));
 bot.use(stage.middleware());
 
 bot.start(async (ctx: MyContext) => {
